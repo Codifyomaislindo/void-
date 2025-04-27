@@ -1,0 +1,390 @@
+-- Core: Inicialização e Serviços
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+-- Carregar Fluent com Fallback
+local Fluent
+local success, result = pcall(function()
+    return loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+end)
+if not success then
+    success, result = pcall(function()
+        return loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/main.lua"))()
+    end)
+    if not success then
+        error("Falha ao carregar a biblioteca Fluent. Verifique sua conexão ou a URL.")
+    end
+end
+Fluent = result
+
+-- Configurações Globais
+local CONFIG = {
+    DETECTION_RANGE = 50,
+    ATTACK_DELAY = 0.5,
+    AUTO_FARM_SPEED = 1,
+    TELEPORT_COOLDOWN = 1,
+    FRUIT_SNIPER_RANGE = 1000,
+    STATS_PRIORITY = {"Melee", "Defense", "Sword"}
+}
+
+-- Estados do Script
+local States = {
+    AutoFarm = { Enabled = false, Mode = "All" },
+    ESP = { Enabled = false, Enemies = true, Fruits = true, Chests = true },
+    Teleport = { InProgress = false, LastTeleport = 0 },
+    AutoRaid = { Enabled = false },
+    AutoStats = { Enabled = false },
+    FruitSniper = { Enabled = false },
+    Events = { SeaEvent = false, MirageIsland = false }
+}
+
+-- Função para Verificar Personagem
+local function isCharacterAlive()
+    return LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") and LocalPlayer.Character.Humanoid.Health > 0
+end
+
+-- Função de Movimentação Suave
+local function moveTo(targetPosition)
+    if not isCharacterAlive() then return end
+    local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+    humanoid:MoveTo(targetPosition)
+    humanoid.MoveToFinished:Wait(CONFIG.AUTO_FARM_SPEED)
+end
+
+-- Função de Teleporte
+local function teleportTo(location)
+    if not isCharacterAlive() or States.Teleport.InProgress or (os.clock() - States.Teleport.LastTeleport < CONFIG.TELEPORT_COOLDOWN) then return end
+    States.Teleport.InProgress = true
+
+    local locations = {
+        PirateIsland = Vector3.new(1050.5, 15.2, 1100.7),
+        MarineIsland = Vector3.new(2050.3, 15.2, 2100.9),
+        FrozenIsland = Vector3.new(3050.7, 15.2, 3100.1)
+    }
+
+    if locations[location] then
+        local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if rootPart then
+            local tween = TweenService:Create(rootPart, TweenInfo.new(0.5, Enum.EasingStyle.Linear), {CFrame = CFrame.new(locations[location])})
+            tween:Play()
+            tween.Completed:Wait()
+        end
+    end
+
+    States.Teleport.LastTeleport = os.clock()
+    States.Teleport.InProgress = false
+end
+
+-- Função de Auto Farm
+local function autoFarm()
+    if not States.AutoFarm.Enabled or not isCharacterAlive() then return end
+    local enemy = Workspace.Enemies:FindFirstChild("Bandit") -- Ajustar para inimigo real
+    if enemy and enemy:FindFirstChild("HumanoidRootPart") then
+        moveTo(enemy.HumanoidRootPart.Position)
+        -- Simular ataque (ajustar com RemoteEvent real)
+        wait(CONFIG.ATTACK_DELAY)
+    end
+end
+
+-- Função ESP
+local function addESP(obj, text, color)
+    if obj:FindFirstChild("ESPBillboard") then return end
+    local billboard = Instance.new("BillboardGui", obj)
+    billboard.Name = "ESPBillboard"
+    billboard.Size = UDim2.new(0, 100, 0, 50)
+    billboard.AlwaysOnTop = true
+    billboard.MaxDistance = 1000
+    local label = Instance.new("TextLabel", billboard)
+    label.Text = text
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = color
+    label.TextScaled = true
+end
+
+local function updateESP()
+    if not States.ESP.Enabled then return end
+    if States.ESP.Enemies then
+        for _, enemy in pairs(Workspace.Enemies:GetChildren()) do
+            if enemy:FindFirstChild("HumanoidRootPart") then
+                addESP(enemy.HumanoidRootPart, "Inimigo", Color3.fromRGB(255, 0, 0))
+            end
+        end
+    end
+    if States.ESP.Fruits then
+        for _, fruit in pairs(Workspace:GetChildren()) do
+            if fruit.Name == "Fruit" then
+                addESP(fruit, "Fruta", Color3.fromRGB(0, 255, 0))
+            end
+        end
+    end
+    if States.ESP.Chests then
+        for _, chest in pairs(Workspace:GetChildren()) do
+            if chest.Name:match("Chest") then
+                addESP(chest, "Baú", Color3.fromRGB(255, 215, 0))
+            end
+        end
+    end
+end
+
+-- Função de Auto Raid (exemplo simplificado)
+local function autoRaid()
+    if not States.AutoRaid.Enabled then return end
+    -- Lógica para detectar e participar de raids (ajustar com RemoteEvent real)
+    Fluent:Notify({ Title = "Auto Raid", Content = "Procurando raid...", Duration = 3 })
+end
+
+-- Função de Auto Stats (exemplo simplificado)
+local function autoStats()
+    if not States.AutoStats.Enabled then return end
+    -- Lógica para alocar stats (ajustar com RemoteEvent real)
+    Fluent:Notify({ Title = "Auto Stats", Content = "Alocando stats...", Duration = 3 })
+end
+
+-- Função de Fruit Sniper (exemplo simplificado)
+local function fruitSniper()
+    if not States.FruitSniper.Enabled then return end
+    for _, fruit in pairs(Workspace:GetChildren()) do
+        if fruit.Name:match("Dragon") or fruit.Name:match("Kitsune") then
+            moveTo(fruit.Position)
+            -- Coletar fruta (ajustar com RemoteEvent real)
+            Fluent:Notify({ Title = "Fruit Sniper", Content = "Fruta rara encontrada!", Duration = 3 })
+            break
+        end
+    end
+end
+
+-- Função para Eventos (exemplo simplificado)
+local function checkEvents()
+    if States.Events.SeaEvent then
+        -- Lógica para Sea Event
+        Fluent:Notify({ Title = "Eventos", Content = "Verificando Sea Event...", Duration = 3 })
+    end
+    if States.Events.MirageIsland then
+        -- Lógica para Mirage Island
+        Fluent:Notify({ Title = "Eventos", Content = "Verificando Mirage Island...", Duration = 3 })
+    end
+end
+
+-- GUI com Fluent
+local Window = Fluent:CreateWindow({
+    Title = "RedzHub Replica",
+    SubTitle = "by Maria",
+    TabWidth = 160,
+    Size = UDim2.new(0, 500, 0, 350),
+    Acrylic = true,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+-- **Tab Farm**
+local FarmTab = Window:CreateTab("Farm")
+local FarmSection = FarmTab:CreateSection("Controles de Farm")
+
+FarmSection:CreateToggle({
+    Name = "Ativar Auto Farm",
+    CurrentValue = false,
+    Callback = function(value)
+        States.AutoFarm.Enabled = value
+        Fluent:Notify({ Title = "Auto Farm", Content = value and "Ativado!" or "Desativado!", Duration = 3 })
+    end
+})
+
+FarmSection:CreateDropdown({
+    Name = "Modo de Farm",
+    Options = {"All", "Level 1-100", "Level 100-300"},
+    CurrentOption = "All",
+    Callback = function(option)
+        States.AutoFarm.Mode = option
+        Fluent:Notify({ Title = "Modo de Farm", Content = "Ajustado para " .. option, Duration = 3 })
+    end
+})
+
+FarmSection:CreateButton({
+    Name = "Coletar Itens",
+    Callback = function()
+        for _, item in pairs(Workspace:GetChildren()) do
+            if item.Name == "Fruit" then moveTo(item.Position) end
+        end
+        Fluent:Notify({ Title = "Coleta", Content = "Coletando itens!", Duration = 3 })
+    end
+})
+
+-- **Tab ESP**
+local ESPTab = Window:CreateTab("ESP")
+local ESPSection = ESPTab:CreateSection("Controles de ESP")
+
+ESPSection:CreateToggle({
+    Name = "Ativar ESP",
+    CurrentValue = false,
+    Callback = function(value)
+        States.ESP.Enabled = value
+        if not value then
+            for _, obj in pairs(Workspace:GetDescendants()) do
+                if obj:FindFirstChild("ESPBillboard") then obj.ESPBillboard:Destroy() end
+            end
+        end
+        Fluent:Notify({ Title = "ESP", Content = value and "Ativado!" or "Desativado!", Duration = 3 })
+    end
+})
+
+ESPSection:CreateToggle({
+    Name = "Inimigos",
+    CurrentValue = true,
+    Callback = function(value) States.ESP.Enemies = value end
+})
+
+ESPSection:CreateToggle({
+    Name = "Frutas",
+    CurrentValue = true,
+    Callback = function(value) States.ESP.Fruits = value end
+})
+
+ESPSection:CreateToggle({
+    Name = "Baús",
+    CurrentValue = true,
+    Callback = function(value) States.ESP.Chests = value end
+})
+
+-- **Tab Teleport**
+local TeleportTab = Window:CreateTab("Teleport")
+local TeleportSection = TeleportTab:CreateSection("Locais de Teleporte")
+
+TeleportSection:CreateDropdown({
+    Name = "Selecionar Local",
+    Options = {"PirateIsland", "MarineIsland", "FrozenIsland"},
+    CurrentOption = "PirateIsland",
+    Callback = function(option)
+        teleportTo(option)
+        Fluent:Notify({ Title = "Teleport", Content = "Teleportado para " .. option, Duration = 3 })
+    end
+})
+
+TeleportSection:CreateButton({
+    Name = "Teleport Rápido",
+    Callback = function()
+        teleportTo("PirateIsland")
+        Fluent:Notify({ Title = "Teleport", Content = "Teleportado rapidamente!", Duration = 3 })
+    end
+})
+
+-- **Tab Raid**
+local RaidTab = Window:CreateTab("Raid")
+local RaidSection = RaidTab:CreateSection("Controles de Raid")
+
+RaidSection:CreateToggle({
+    Name = "Ativar Auto Raid",
+    CurrentValue = false,
+    Callback = function(value)
+        States.AutoRaid.Enabled = value
+        Fluent:Notify({ Title = "Auto Raid", Content = value and "Ativado!" or "Desativado!", Duration = 3 })
+    end
+})
+
+RaidSection:CreateButton({
+    Name = "Iniciar Raid",
+    Callback = function()
+        if States.AutoRaid.Enabled then
+            autoRaid()
+        end
+    end
+})
+
+-- **Tab Stats**
+local StatsTab = Window:CreateTab("Stats")
+local StatsSection = StatsTab:CreateSection("Controles de Stats")
+
+StatsSection:CreateToggle({
+    Name = "Ativar Auto Stats",
+    CurrentValue = false,
+    Callback = function(value)
+        States.AutoStats.Enabled = value
+        Fluent:Notify({ Title = "Auto Stats", Content = value and "Ativado!" or "Desativado!", Duration = 3 })
+    end
+})
+
+StatsSection:CreateDropdown({
+    Name = "Prioridade de Stats",
+    Options = CONFIG.STATS_PRIORITY,
+    CurrentOption = "Melee",
+    Callback = function(option)
+        -- Ajustar prioridade (exemplo)
+        Fluent:Notify({ Title = "Stats", Content = "Prioridade ajustada para " .. option, Duration = 3 })
+    end
+})
+
+-- **Tab Events**
+local EventsTab = Window:CreateTab("Events")
+local EventsSection = EventsTab:CreateSection("Controles de Eventos")
+
+EventsSection:CreateToggle({
+    Name = "Sea Event",
+    CurrentValue = false,
+    Callback = function(value)
+        States.Events.SeaEvent = value
+        Fluent:Notify({ Title = "Sea Event", Content = value and "Ativado!" or "Desativado!", Duration = 3 })
+    end
+})
+
+EventsSection:CreateToggle({
+    Name = "Mirage Island",
+    CurrentValue = false,
+    Callback = function(value)
+        States.Events.MirageIsland = value
+        Fluent:Notify({ Title = "Mirage Island", Content = value and "Ativado!" or "Desativado!", Duration = 3 })
+    end
+})
+
+-- **Tab Misc**
+local MiscTab = Window:CreateTab("Misc")
+local MiscSection = MiscTab:CreateSection("Configurações Adicionais")
+
+MiscSection:CreateToggle({
+    Name = "Fruit Sniper",
+    CurrentValue = false,
+    Callback = function(value)
+        States.FruitSniper.Enabled = value
+        Fluent:Notify({ Title = "Fruit Sniper", Content = value and "Ativado!" or "Desativado!", Duration = 3 })
+    end
+})
+
+MiscSection:CreateSlider({
+    Name = "Velocidade de Farm",
+    Min = 0.5,
+    Max = 2,
+    Increment = 0.1,
+    Current = 1,
+    Callback = function(value)
+        CONFIG.AUTO_FARM_SPEED = value
+        Fluent:Notify({ Title = "Velocidade", Content = "Ajustada para " .. value, Duration = 3 })
+    end
+})
+
+-- Loop Principal
+spawn(function()
+    while true do
+        if isCharacterAlive() then
+            autoFarm()
+            updateESP()
+            autoRaid()
+            autoStats()
+            fruitSniper()
+            checkEvents()
+        end
+        wait(0.1 * CONFIG.AUTO_FARM_SPEED)
+    end
+end)
+
+-- Notificação de Inicialização
+Fluent:Notify({
+    Title = "Script Carregado",
+    Content = "RedzHub Replica by Maria está pronto!",
+    Duration = 5
+})
